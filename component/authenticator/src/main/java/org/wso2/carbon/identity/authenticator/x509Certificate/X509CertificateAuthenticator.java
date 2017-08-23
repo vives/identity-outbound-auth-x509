@@ -69,14 +69,13 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
             if (authenticationContext.isRetrying()) {
                 if (Boolean.parseBoolean(String.valueOf(authenticationContext.
                         getProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE)))) {
-                    String errorPage =
-                            IdentityUtil.getServerURL(X509CertificateConstants.ERROR_PAGE, false, false);
+                    String errorPage = IdentityUtil.getServerURL(X509CertificateConstants.ERROR_PAGE, false, false);
                     String errorPageUrl =
                             errorPage + ("?sessionDataKey=" + authenticationContext.getContextIdentifier()) +
-                                    "&authenticators=" + getName() + X509CertificateConstants.RETRY_PARAM ;
+                                    "&authenticators=" + getName() + X509CertificateConstants.RETRY_PARAM;
                     httpServletResponse.sendRedirect(errorPageUrl);
                 }
-            }else {
+            } else {
                 if (getAuthenticatorConfig().getParameterMap()
                         .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT) != null) {
                     authEndpoint = getAuthenticatorConfig().getParameterMap()
@@ -154,7 +153,7 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
             }
         } else {
             authenticationContext.setProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE, true);
-            throw new AuthenticationFailedException("Unable to find verified user from DUO ");
+            throw new AuthenticationFailedException("Unable to find X509 Certificate");
         }
     }
 
@@ -165,8 +164,7 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
      * @return boolean status
      */
     public boolean canHandle(HttpServletRequest httpServletRequest) {
-//        Object object = httpServletRequest.getAttribute(X509CertificateConstants.X_509_CERTIFICATE);
-        return (httpServletRequest.getParameter(X509CertificateConstants.SUCCESS) != null /*|| object == null*/);
+        return (httpServletRequest.getParameter(X509CertificateConstants.SUCCESS) != null);
     }
 
     /**
