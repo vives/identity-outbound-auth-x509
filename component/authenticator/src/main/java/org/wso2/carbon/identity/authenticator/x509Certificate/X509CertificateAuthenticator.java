@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  *  WSO2 Inc. licenses this file to you under the Apache License,
  *  Version 2.0 (the "License"); you may not use this file except
@@ -30,6 +30,7 @@ import org.wso2.carbon.identity.application.authentication.framework.exception.A
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
+import org.wso2.carbon.identity.core.util.IdentityUtil;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -65,20 +66,32 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
             throws AuthenticationFailedException {
         String authEndpoint = null;
         try {
-            if (getAuthenticatorConfig().getParameterMap()
-                    .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT) != null) {
-                authEndpoint = getAuthenticatorConfig().getParameterMap()
-                        .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT);
-            } else {
-                authEndpoint = X509CertificateConstants.AUTH_ENDPOINT;
-            }
-            String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
-                    authenticationContext.getQueryParams(), authenticationContext.getCallerSessionKey(),
-                    authenticationContext.getContextIdentifier());
-            String encodedUrl = (authEndpoint + ("?" + queryParams));
-            httpServletResponse.sendRedirect(encodedUrl);
-            if (log.isDebugEnabled()) {
-                log.debug("Request send to " + authEndpoint);
+            if (authenticationContext.isRetrying()) {
+                if (Boolean.parseBoolean(String.valueOf(authenticationContext.
+                        getProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE)))) {
+                    String errorPage =
+                            IdentityUtil.getServerURL(X509CertificateConstants.ERROR_PAGE, false, false);
+                    String errorPageUrl =
+                            errorPage + ("?sessionDataKey=" + authenticationContext.getContextIdentifier()) +
+                                    "&authenticators=" + getName() + X509CertificateConstants.RETRY_PARAM ;
+                    httpServletResponse.sendRedirect(errorPageUrl);
+                }
+            }else {
+                if (getAuthenticatorConfig().getParameterMap()
+                        .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT) != null) {
+                    authEndpoint = getAuthenticatorConfig().getParameterMap()
+                            .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT);
+                } else {
+                    authEndpoint = X509CertificateConstants.AUTH_ENDPOINT;
+                }
+                String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
+                        authenticationContext.getQueryParams(), authenticationContext.getCallerSessionKey(),
+                        authenticationContext.getContextIdentifier());
+                String encodedUrl = (authEndpoint + ("?" + queryParams));
+                httpServletResponse.sendRedirect(encodedUrl);
+                if (log.isDebugEnabled()) {
+                    log.debug("Request send to " + authEndpoint);
+                }
             }
         } catch (IOException e) {
             throw new AuthenticationFailedException("Error when sending to the login page :"
@@ -140,7 +153,8 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                 throw new AuthenticationFailedException("X509Certificate object is null");
             }
         } else {
-            throw new AuthenticationFailedException("X509Certificate not found");
+            authenticationContext.setProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE, true);
+            throw new AuthenticationFailedException("Unable to find verified user from DUO ");
         }
     }
 
@@ -151,7 +165,8 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
      * @return boolean status
      */
     public boolean canHandle(HttpServletRequest httpServletRequest) {
-        return httpServletRequest.getParameter(X509CertificateConstants.SUCCESS) != null;
+//        Object object = httpServletRequest.getAttribute(X509CertificateConstants.X_509_CERTIFICATE);
+        return (httpServletRequest.getParameter(X509CertificateConstants.SUCCESS) != null /*|| object == null*/);
     }
 
     /**
@@ -266,5 +281,15 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
         authenticatedUserObj.setAuthenticatedSubjectIdentifier(String.valueOf(cert.getSerialNumber()));
         authenticatedUserObj.setUserAttributes(claims);
         authenticationContext.setSubject(authenticatedUserObj);
+    }
+
+    /**
+     * Check whether status of retrying authentication.
+     *
+     * @return true, if retry authentication is enabled
+     */
+    @Override
+    protected boolean retryAuthenticationEnabled() {
+        return true;
     }
 }

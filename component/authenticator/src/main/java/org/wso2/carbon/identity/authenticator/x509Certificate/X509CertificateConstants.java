@@ -25,7 +25,7 @@ package org.wso2.carbon.identity.authenticator.x509Certificate;
 public class X509CertificateConstants {
     public static final String AUTHENTICATOR_NAME = "x509CertificateAuthenticator";
     public static final String AUTHENTICATOR_FRIENDLY_NAME = "X509Certificate";
-    public static final String USER_CERTIFICATE = "http://wso2.org/claims/userCertificate";
+    public static final String USER_CERTIFICATE = "http://wso2.org/claims/identity/userCertificate";
     public static final String DEFAULT = "default";
     public static final String X_509_CERTIFICATE = "javax.servlet.request.X509Certificate";
     public static final String SESSION_DATA_KEY = "sessionDataKey";
@@ -36,4 +36,7 @@ public class X509CertificateConstants {
     public static final String AUTHENTICATION_ENDPOINT = "AuthenticationEndpoint";
     public static final String USERNAME = "username";
     public static final String SUCCESS = "success";
+    public static final String RETRY_PARAM = "&authFailure=true&authFailureMsg=authentication.fail.message";
+    public static final String ERROR_PAGE = "x509certificateauthenticationendpoint/x509CertificateError.jsp";
+    public static final String UNABLE_TO_FIND_CERTIFICATE = "certificateNotFound";
 }

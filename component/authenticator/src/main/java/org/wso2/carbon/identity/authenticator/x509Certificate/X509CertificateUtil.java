@@ -28,6 +28,8 @@ import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import javax.security.cert.X509Certificate;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Working with certificate and claims store
@@ -37,24 +39,23 @@ public class X509CertificateUtil extends AbstractAdmin {
     /**
      * Get certificate from claims.
      *
-     * @param userName name of the user
+     * @param username name of the user
      * @return x509 certificate
      * @throws AuthenticationFailedException authentication failed exception
      */
-    private static X509Certificate getCertificate(String userName)
-            throws AuthenticationFailedException {
+    private static X509Certificate getCertificate(String username) throws AuthenticationFailedException {
         X509Certificate x509Certificate;
         UserStoreManager userStoreManager;
         RealmService realmService = X509CertificateRealmServiceComponent.getRealmService();
         try {
-            String tenantDomain = MultitenantUtils.getTenantDomain(userName);
+            String tenantDomain = MultitenantUtils.getTenantDomain(username);
             int tenantID = realmService.getTenantManager().getTenantId(tenantDomain);
             userStoreManager = realmService.getTenantUserRealm(tenantID).getUserStoreManager();
+            Map<String, String> userClaimValues = userStoreManager .getUserClaimValues(username, new
+                    String[] { X509CertificateConstants.USER_CERTIFICATE }, null);
             String certificate;
-            if (userStoreManager.getUserClaimValue(userName, X509CertificateConstants.USER_CERTIFICATE,
-                    X509CertificateConstants.DEFAULT) != null) {
-                certificate = userStoreManager.getUserClaimValue(userName,
-                        X509CertificateConstants.USER_CERTIFICATE, X509CertificateConstants.DEFAULT);
+            if (userClaimValues != null) {
+                certificate = userClaimValues.get(X509CertificateConstants.USER_CERTIFICATE);
             } else {
                 return null;
             }
@@ -70,18 +71,19 @@ public class X509CertificateUtil extends AbstractAdmin {
     /**
      * Add certificate into claims.
      *
-     * @param userName         name of the user
+     * @param username         name of the user
      * @param certificateBytes x509 certificate
      * @return boolean status of the action
      * @throws AuthenticationFailedException authentication failed exception
      */
-    public synchronized boolean addCertificate(String userName, byte[] certificateBytes)
+    public synchronized boolean addCertificate(String username, byte[] certificateBytes)
             throws AuthenticationFailedException {
+        Map<String, String> claims = new HashMap<>();
         try {
             X509Certificate x509Certificate = X509Certificate.getInstance(certificateBytes);
+            claims.put(X509CertificateConstants.USER_CERTIFICATE, Base64.encode(x509Certificate.getEncoded()));
             org.wso2.carbon.user.core.UserStoreManager userStoreManager = getUserRealm().getUserStoreManager();
-            userStoreManager.setUserClaimValue(userName, X509CertificateConstants.USER_CERTIFICATE,
-                    Base64.encode(x509Certificate.getEncoded()), X509CertificateConstants.DEFAULT);
+            userStoreManager.setUserClaimValues(username, claims, X509CertificateConstants.DEFAULT);
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while retrieving certificate ", e);
         } catch (UserStoreException e) {
