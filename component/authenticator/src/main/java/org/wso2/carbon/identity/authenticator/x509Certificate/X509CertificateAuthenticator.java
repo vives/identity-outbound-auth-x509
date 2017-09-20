@@ -64,7 +64,7 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                                                  HttpServletResponse httpServletResponse,
                                                  AuthenticationContext authenticationContext)
             throws AuthenticationFailedException {
-        String authEndpoint = null;
+        String authEndpoint = X509CertificateConstants.AUTH_ENDPOINT;;
         try {
             if (authenticationContext.isRetrying()) {
                 if (Boolean.parseBoolean(String.valueOf(authenticationContext.
@@ -76,12 +76,10 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                     httpServletResponse.sendRedirect(errorPageUrl);
                 }
             } else {
-                if (getAuthenticatorConfig().getParameterMap()
-                        .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT) != null) {
-                    authEndpoint = getAuthenticatorConfig().getParameterMap()
-                            .get(X509CertificateConstants.AUTHENTICATION_ENDPOINT);
-                } else {
-                    authEndpoint = X509CertificateConstants.AUTH_ENDPOINT;
+                String authEndpointParam = getAuthenticatorConfig().getParameterMap().
+                        get(X509CertificateConstants.AUTHENTICATION_ENDPOINT);
+                if (StringUtils.isNotEmpty(authEndpointParam)) {
+                    authEndpoint = authEndpointParam;
                 }
                 String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(
                         authenticationContext.getQueryParams(), authenticationContext.getCallerSessionKey(),

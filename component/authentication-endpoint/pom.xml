@@ -40,7 +40,6 @@
             <groupId>javax.servlet</groupId>
             <artifactId>servlet-api</artifactId>
             <version>${javax.servlet-api.version}</version>
-
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
@@ -61,7 +60,6 @@
             <groupId>org.wso2.carbon.identity</groupId>
             <artifactId>org.wso2.carbon.identity.application.authentication.endpoint.util</artifactId>
             <version>${carbon.identity.version}</version>
-
         </dependency>
         <dependency>
             <groupId>org.wso2.securevault</groupId>
