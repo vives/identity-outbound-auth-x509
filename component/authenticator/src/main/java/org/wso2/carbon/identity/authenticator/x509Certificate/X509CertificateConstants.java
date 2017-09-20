@@ -25,7 +25,7 @@ package org.wso2.carbon.identity.authenticator.x509Certificate;
 public class X509CertificateConstants {
     public static final String AUTHENTICATOR_NAME = "x509CertificateAuthenticator";
     public static final String AUTHENTICATOR_FRIENDLY_NAME = "X509Certificate";
-    public static final String CLAIM_DIALECT_URI = "http://wso2.org/claims/identity/userCertificate";
+    public static final String CLAIM_DIALECT_URI = "http://wso2.org/claims/userCertificate";
     public static final String DEFAULT = "default";
     public static final String X_509_CERTIFICATE = "javax.servlet.request.X509Certificate";
     public static final String SESSION_DATA_KEY = "sessionDataKey";

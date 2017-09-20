@@ -93,8 +93,8 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                 }
             }
         } catch (IOException e) {
-            throw new AuthenticationFailedException("Error when sending to the login page :"
-                    + authEndpoint, e);
+            throw new AuthenticationFailedException("Exception while redirecting to the login page :" + authEndpoint,
+                    e);
         }
     }
 

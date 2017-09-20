@@ -54,11 +54,7 @@ public class X509CertificateUtil extends AbstractAdmin {
             String tenantDomain = MultitenantUtils.getTenantDomain(username);
             int tenantID = realmService.getTenantManager().getTenantId(tenantDomain);
             userStoreManager = realmService.getTenantUserRealm(tenantID).getUserStoreManager();
-            String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
-            Object claimURIObj = getX509Parameters().get(X509CertificateConstants.CLAIM_URI);
-            if (claimURIObj != null) {
-                claimURI = String.valueOf(claimURIObj);
-            }
+            String claimURI = getClaimUri();
             Map<String, String> userClaimValues = userStoreManager.getUserClaimValues(username, new
                     String[] { claimURI }, null);
             String userCertificate = userClaimValues.get(claimURI);
@@ -87,19 +83,14 @@ public class X509CertificateUtil extends AbstractAdmin {
             throws AuthenticationFailedException {
         Map<String, String> claims = new HashMap<>();
         try {
-            String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
-            Object claimURIObj = getX509Parameters().get(X509CertificateConstants.CLAIM_URI);
-            if (claimURIObj != null) {
-                claimURI = String.valueOf(claimURIObj);
-            }
             X509Certificate x509Certificate = X509Certificate.getInstance(certificateBytes);
-            claims.put(claimURI, Base64.encode(x509Certificate.getEncoded()));
+            claims.put(getClaimUri(), Base64.encode(x509Certificate.getEncoded()));
             org.wso2.carbon.user.core.UserStoreManager userStoreManager = getUserRealm().getUserStoreManager();
             userStoreManager.setUserClaimValues(username, claims, X509CertificateConstants.DEFAULT);
         } catch (javax.security.cert.CertificateException e) {
-            throw new AuthenticationFailedException("Error while retrieving certificate ", e);
+            throw new AuthenticationFailedException("Error while retrieving certificate of user: " + username, e);
         } catch (UserStoreException e) {
-            throw new AuthenticationFailedException("Error while set certificate ", e);
+            throw new AuthenticationFailedException("Error while setting certificate of user: " + username, e);
         }
         return true;
     }
@@ -139,6 +130,26 @@ public class X509CertificateUtil extends AbstractAdmin {
     private static Map<String, String> getX509Parameters() {
         AuthenticatorConfig authConfig = FileBasedConfigurationBuilder.getInstance()
                 .getAuthenticatorBean(X509CertificateConstants.AUTHENTICATOR_NAME);
-        return authConfig.getParameterMap();
+        if(authConfig != null) {
+            return authConfig.getParameterMap();
+        }
+        return null;
+    }
+
+    /**
+     * Get user claimURI value.
+     *
+     * @return claimURI
+     */
+    private static String getClaimUri(){
+        String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
+        Map<String, String> parametersMap = getX509Parameters();
+        if(parametersMap != null) {
+            Object claimURIObj = parametersMap.get(X509CertificateConstants.CLAIM_URI);
+            if (claimURIObj != null) {
+                claimURI = String.valueOf(claimURIObj);
+            }
+        }
+        return claimURI;
     }
 }
