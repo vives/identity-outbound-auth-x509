@@ -21,11 +21,14 @@ package org.wso2.carbon.identity.authenticator.x509Certificate;
 
 import org.apache.axiom.om.util.Base64;
 import org.wso2.carbon.core.AbstractAdmin;
+import org.wso2.carbon.identity.application.authentication.framework.config.builder.FileBasedConfigurationBuilder;
+import org.wso2.carbon.identity.application.authentication.framework.config.model.AuthenticatorConfig;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.user.api.UserStoreManager;
 import org.wso2.carbon.user.core.UserStoreException;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
+import org.apache.commons.lang.StringUtils;
 
 import javax.security.cert.X509Certificate;
 import java.util.HashMap;
@@ -51,15 +54,19 @@ public class X509CertificateUtil extends AbstractAdmin {
             String tenantDomain = MultitenantUtils.getTenantDomain(username);
             int tenantID = realmService.getTenantManager().getTenantId(tenantDomain);
             userStoreManager = realmService.getTenantUserRealm(tenantID).getUserStoreManager();
-            Map<String, String> userClaimValues = userStoreManager .getUserClaimValues(username, new
-                    String[] { X509CertificateConstants.USER_CERTIFICATE }, null);
-            String certificate;
-            if (userClaimValues != null) {
-                certificate = userClaimValues.get(X509CertificateConstants.USER_CERTIFICATE);
+            String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
+            Object claimURIObj = getX509Parameters().get(X509CertificateConstants.CLAIM_URI);
+            if (claimURIObj != null) {
+                claimURI = String.valueOf(claimURIObj);
+            }
+            Map<String, String> userClaimValues = userStoreManager.getUserClaimValues(username, new
+                    String[] { claimURI }, null);
+            String userCertificate = userClaimValues.get(claimURI);
+            if (StringUtils.isNotEmpty(userCertificate)) {
+                x509Certificate = X509Certificate.getInstance(Base64.decode(userCertificate));
             } else {
                 return null;
             }
-            x509Certificate = X509Certificate.getInstance(Base64.decode(certificate));
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while decoding the certificate ", e);
         } catch (org.wso2.carbon.user.api.UserStoreException e) {
@@ -80,8 +87,13 @@ public class X509CertificateUtil extends AbstractAdmin {
             throws AuthenticationFailedException {
         Map<String, String> claims = new HashMap<>();
         try {
+            String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
+            Object claimURIObj = getX509Parameters().get(X509CertificateConstants.CLAIM_URI);
+            if (claimURIObj != null) {
+                claimURI = String.valueOf(claimURIObj);
+            }
             X509Certificate x509Certificate = X509Certificate.getInstance(certificateBytes);
-            claims.put(X509CertificateConstants.USER_CERTIFICATE, Base64.encode(x509Certificate.getEncoded()));
+            claims.put(claimURI, Base64.encode(x509Certificate.getEncoded()));
             org.wso2.carbon.user.core.UserStoreManager userStoreManager = getUserRealm().getUserStoreManager();
             userStoreManager.setUserClaimValues(username, claims, X509CertificateConstants.DEFAULT);
         } catch (javax.security.cert.CertificateException e) {
@@ -119,5 +131,14 @@ public class X509CertificateUtil extends AbstractAdmin {
      */
     public synchronized boolean isCertificateExist(String userName) throws AuthenticationFailedException {
         return getCertificate(userName) != null;
+    }
+
+    /**
+     * Get parameter values from local file.
+     */
+    private static Map<String, String> getX509Parameters() {
+        AuthenticatorConfig authConfig = FileBasedConfigurationBuilder.getInstance()
+                .getAuthenticatorBean(X509CertificateConstants.AUTHENTICATOR_NAME);
+        return authConfig.getParameterMap();
     }
 }
