@@ -20,10 +20,13 @@
 package org.wso2.carbon.identity.authenticator.x509Certificate;
 
 import org.apache.axiom.om.util.Base64;
+import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.core.AbstractAdmin;
 import org.wso2.carbon.identity.application.authentication.framework.config.builder.FileBasedConfigurationBuilder;
 import org.wso2.carbon.identity.application.authentication.framework.config.model.AuthenticatorConfig;
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
+import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
+import org.wso2.carbon.user.api.UserRealm;
 import org.wso2.carbon.user.api.UserStoreManager;
 import org.wso2.carbon.user.core.UserStoreException;
 import org.wso2.carbon.user.core.service.RealmService;
@@ -48,20 +51,22 @@ public class X509CertificateUtil extends AbstractAdmin {
      */
     private static X509Certificate getCertificate(String username) throws AuthenticationFailedException {
         X509Certificate x509Certificate;
-        UserStoreManager userStoreManager;
-        RealmService realmService = X509CertificateRealmServiceComponent.getRealmService();
+        UserRealm userRealm = getUserRealm(username);
         try {
-            String tenantDomain = MultitenantUtils.getTenantDomain(username);
-            int tenantID = realmService.getTenantManager().getTenantId(tenantDomain);
-            userStoreManager = realmService.getTenantUserRealm(tenantID).getUserStoreManager();
+            String tenantAwareUsername = MultitenantUtils.getTenantAwareUsername(username);
             String claimURI = getClaimUri();
-            Map<String, String> userClaimValues = userStoreManager.getUserClaimValues(username, new
-                    String[] { claimURI }, null);
-            String userCertificate = userClaimValues.get(claimURI);
-            if (StringUtils.isNotEmpty(userCertificate)) {
-                x509Certificate = X509Certificate.getInstance(Base64.decode(userCertificate));
-            } else {
-                return null;
+            if (userRealm != null) {
+                Map<String, String> userClaimValues = userRealm.getUserStoreManager()
+                        .getUserClaimValues(tenantAwareUsername, new String[]{claimURI}, null);
+                String userCertificate = userClaimValues.get(claimURI);
+                if (StringUtils.isNotEmpty(userCertificate)) {
+                    x509Certificate = X509Certificate.getInstance(Base64.decode(userCertificate));
+                } else {
+                    return null;
+                }
+            }else {
+                throw new AuthenticationFailedException("Cannot find the user realm for the given tenant domain : " +
+                                CarbonContext.getThreadLocalCarbonContext().getTenantDomain());
             }
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while decoding the certificate ", e);
@@ -82,15 +87,24 @@ public class X509CertificateUtil extends AbstractAdmin {
     public synchronized boolean addCertificate(String username, byte[] certificateBytes)
             throws AuthenticationFailedException {
         Map<String, String> claims = new HashMap<>();
+        UserRealm userRealm = getUserRealm(username);
         try {
-            X509Certificate x509Certificate = X509Certificate.getInstance(certificateBytes);
-            claims.put(getClaimUri(), Base64.encode(x509Certificate.getEncoded()));
-            org.wso2.carbon.user.core.UserStoreManager userStoreManager = getUserRealm().getUserStoreManager();
-            userStoreManager.setUserClaimValues(username, claims, X509CertificateConstants.DEFAULT);
+            if (userRealm != null) {
+                X509Certificate x509Certificate = X509Certificate.getInstance(certificateBytes);
+                claims.put(getClaimUri(), Base64.encode(x509Certificate.getEncoded()));
+                String tenantAwareUsername = MultitenantUtils.getTenantAwareUsername(username);
+                userRealm.getUserStoreManager().setUserClaimValues(tenantAwareUsername, claims,
+                        X509CertificateConstants.DEFAULT);
+            } else {
+                throw new AuthenticationFailedException("Cannot find the user realm for the given tenant domain : " +
+                        CarbonContext.getThreadLocalCarbonContext().getTenantDomain());
+            }
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while retrieving certificate of user: " + username, e);
         } catch (UserStoreException e) {
             throw new AuthenticationFailedException("Error while setting certificate of user: " + username, e);
+        }catch (org.wso2.carbon.user.api.UserStoreException e) {
+            throw new AuthenticationFailedException("Error while user manager for tenant id", e);
         }
         return true;
     }
@@ -151,5 +165,27 @@ public class X509CertificateUtil extends AbstractAdmin {
             }
         }
         return claimURI;
+    }
+
+    /**
+     * Get the user realm of the logged in user.
+     *
+     * @param username the username
+     * @return the userRealm for given username
+     * @throws AuthenticationFailedException
+     */
+    public static UserRealm getUserRealm(String username) throws AuthenticationFailedException {
+        UserRealm userRealm = null;
+        try {
+            if (username != null) {
+                String tenantDomain = MultitenantUtils.getTenantDomain(username);
+                int tenantId = IdentityTenantUtil.getTenantId(tenantDomain);
+                RealmService realmService = X509CertificateRealmServiceComponent.getRealmService();
+                userRealm = realmService.getTenantUserRealm(tenantId);
+            }
+        } catch (org.wso2.carbon.user.api.UserStoreException e) {
+            throw new AuthenticationFailedException("Cannot find the user realm for the username: " + username, e);
+        }
+        return userRealm;
     }
 }
