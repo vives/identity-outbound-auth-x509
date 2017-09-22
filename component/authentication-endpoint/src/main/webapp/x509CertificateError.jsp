@@ -44,8 +44,10 @@
             if (request.getParameter(Constants.AUTH_FAILURE_MSG) != null) {
                 errorMessage = request.getParameter(Constants.AUTH_FAILURE_MSG);
 
-                if (errorMessage.equalsIgnoreCase("authentication.fail.message")) {
-                    errorMessage = resourceBundle.getString("error.message");
+                if (errorMessage.equalsIgnoreCase("certificate.not.found")) {
+                    errorMessage = resourceBundle.getString("certificateNotFound.error.message");
+                } else {
+                errorMessage = resourceBundle.getString("authentication.failed.message");
                 }
             }
         }
@@ -57,11 +59,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>WSO2 Identity Server</title>
 
-        <link rel="icon" href="images/favicon.png" type="image/x-icon"/>
         <link href="libs/bootstrap_3.3.5/css/bootstrap.min.css" rel="stylesheet">
-        <link href="css/Roboto.css" rel="stylesheet">
         <link href="css/custom-common.css" rel="stylesheet">
-
         <script src="js/scripts.js"></script>
         <script src="assets/js/jquery-1.7.1.min.js"></script>
         <!--[if lt IE 9]>
@@ -132,4 +131,5 @@
     <script src="libs/bootstrap_3.3.5/js/bootstrap.min.js"></script>
     </body>
     </html>
-</fmt:bundle>
+</fmt:bundl
+e>

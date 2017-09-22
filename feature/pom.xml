@@ -27,7 +27,7 @@
     </parent>
     <artifactId>org.wso2.carbon.extension.identity.authenticator.x509Certificate.feature</artifactId>
     <packaging>pom</packaging>
-    <name>WSO2 Carbon - X509Certificate Feature</name>
+    <name>WSO2 Carbon - X509Certificate Authenticator Feature</name>
     <url>http://wso2.org</url>
     <description>This feature contains extension feature for X509Certificate</description>
     <dependencies>

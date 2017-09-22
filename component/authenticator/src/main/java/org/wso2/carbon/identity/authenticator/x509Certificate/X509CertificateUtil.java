@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *  Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  *  WSO2 Inc. licenses this file to you under the Apache License,
  *  Version 2.0 (the "License"); you may not use this file except
@@ -20,6 +20,8 @@
 package org.wso2.carbon.identity.authenticator.x509Certificate;
 
 import org.apache.axiom.om.util.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.context.CarbonContext;
 import org.wso2.carbon.core.AbstractAdmin;
 import org.wso2.carbon.identity.application.authentication.framework.config.builder.FileBasedConfigurationBuilder;
@@ -32,15 +34,17 @@ import org.wso2.carbon.user.core.UserStoreException;
 import org.wso2.carbon.user.core.service.RealmService;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 import org.apache.commons.lang.StringUtils;
+import sun.security.ssl.Debug;
 
 import javax.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Working with certificate and claims store
+ * Working with certificate and claims store.
  */
-public class X509CertificateUtil extends AbstractAdmin {
+public class X509CertificateUtil {
+    private static Log log = LogFactory.getLog(X509CertificateUtil.class);
 
     /**
      * Get certificate from claims.
@@ -59,14 +63,20 @@ public class X509CertificateUtil extends AbstractAdmin {
                 Map<String, String> userClaimValues = userRealm.getUserStoreManager()
                         .getUserClaimValues(tenantAwareUsername, new String[]{claimURI}, null);
                 String userCertificate = userClaimValues.get(claimURI);
+                if (log.isDebugEnabled()) {
+                    log.debug("The user certificate is " + userCertificate);
+                }
                 if (StringUtils.isNotEmpty(userCertificate)) {
                     x509Certificate = X509Certificate.getInstance(Base64.decode(userCertificate));
                 } else {
                     return null;
                 }
-            }else {
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("UserRealm is null for username: " + username);
+                }
                 throw new AuthenticationFailedException("Cannot find the user realm for the given tenant domain : " +
-                                CarbonContext.getThreadLocalCarbonContext().getTenantDomain());
+                        CarbonContext.getThreadLocalCarbonContext().getTenantDomain());
             }
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while decoding the certificate ", e);
@@ -84,7 +94,7 @@ public class X509CertificateUtil extends AbstractAdmin {
      * @return boolean status of the action
      * @throws AuthenticationFailedException authentication failed exception
      */
-    public synchronized boolean addCertificate(String username, byte[] certificateBytes)
+    public static synchronized boolean addCertificate(String username, byte[] certificateBytes)
             throws AuthenticationFailedException {
         Map<String, String> claims = new HashMap<>();
         UserRealm userRealm = getUserRealm(username);
@@ -96,6 +106,9 @@ public class X509CertificateUtil extends AbstractAdmin {
                 userRealm.getUserStoreManager().setUserClaimValues(tenantAwareUsername, claims,
                         X509CertificateConstants.DEFAULT);
             } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("UserRealm is null for username: " + username);
+                }
                 throw new AuthenticationFailedException("Cannot find the user realm for the given tenant domain : " +
                         CarbonContext.getThreadLocalCarbonContext().getTenantDomain());
             }
@@ -103,8 +116,11 @@ public class X509CertificateUtil extends AbstractAdmin {
             throw new AuthenticationFailedException("Error while retrieving certificate of user: " + username, e);
         } catch (UserStoreException e) {
             throw new AuthenticationFailedException("Error while setting certificate of user: " + username, e);
-        }catch (org.wso2.carbon.user.api.UserStoreException e) {
+        } catch (org.wso2.carbon.user.api.UserStoreException e) {
             throw new AuthenticationFailedException("Error while user manager for tenant id", e);
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("X509 certificate is added for user: " + username);
         }
         return true;
     }
@@ -117,13 +133,20 @@ public class X509CertificateUtil extends AbstractAdmin {
      * @return boolean status of the action
      * @throws AuthenticationFailedException
      */
-    public synchronized boolean validateCerts(String userName, byte[] certificateBytes)
+    public static synchronized boolean validateCerts(String userName, byte[] certificateBytes)
             throws AuthenticationFailedException {
         X509Certificate x509Certificate;
+        if (log.isDebugEnabled()) {
+            log.debug("X509 certificate is getting validated");
+        }
         try {
             x509Certificate = X509Certificate.getInstance(certificateBytes);
         } catch (javax.security.cert.CertificateException e) {
             throw new AuthenticationFailedException("Error while retrieving certificate ", e);
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("X509 certificate validation is completed. Result is " +
+                    x509Certificate.equals(getCertificate(userName)));
         }
         return x509Certificate.equals(getCertificate(userName));
     }
@@ -134,7 +157,7 @@ public class X509CertificateUtil extends AbstractAdmin {
      * @param userName name of the user
      * @return boolean status of availability
      */
-    public synchronized boolean isCertificateExist(String userName) throws AuthenticationFailedException {
+    public static synchronized boolean isCertificateExist(String userName) throws AuthenticationFailedException {
         return getCertificate(userName) != null;
     }
 
@@ -144,8 +167,11 @@ public class X509CertificateUtil extends AbstractAdmin {
     private static Map<String, String> getX509Parameters() {
         AuthenticatorConfig authConfig = FileBasedConfigurationBuilder.getInstance()
                 .getAuthenticatorBean(X509CertificateConstants.AUTHENTICATOR_NAME);
-        if(authConfig != null) {
+        if (authConfig != null) {
             return authConfig.getParameterMap();
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("AuthenticatorConfig is not provided for " + X509CertificateConstants.AUTHENTICATOR_NAME);
         }
         return null;
     }
@@ -155,14 +181,17 @@ public class X509CertificateUtil extends AbstractAdmin {
      *
      * @return claimURI
      */
-    private static String getClaimUri(){
+    private static String getClaimUri() {
         String claimURI = X509CertificateConstants.CLAIM_DIALECT_URI;
         Map<String, String> parametersMap = getX509Parameters();
-        if(parametersMap != null) {
+        if (parametersMap != null) {
             Object claimURIObj = parametersMap.get(X509CertificateConstants.CLAIM_URI);
             if (claimURIObj != null) {
                 claimURI = String.valueOf(claimURIObj);
             }
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("The X509Certificate claimUri is " + claimURI);
         }
         return claimURI;
     }
@@ -176,6 +205,9 @@ public class X509CertificateUtil extends AbstractAdmin {
      */
     public static UserRealm getUserRealm(String username) throws AuthenticationFailedException {
         UserRealm userRealm = null;
+        if (log.isDebugEnabled()) {
+            log.debug("Getting userRealm for user: " + username);
+        }
         try {
             if (username != null) {
                 String tenantDomain = MultitenantUtils.getTenantDomain(username);

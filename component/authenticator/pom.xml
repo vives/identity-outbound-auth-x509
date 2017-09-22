@@ -26,6 +26,13 @@
     <artifactId>org.wso2.carbon.extension.identity.authenticator.x509Certificate.connector</artifactId>
     <packaging>bundle</packaging>
     <name>WSO2 Carbon - X509Certificate Authenticator</name>
+    <dependencies>
+        <dependency>
+            <groupId>org.wso2.carbon.identity</groupId>
+            <artifactId>org.wso2.carbon.identity.application.authentication.framework</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
     <repositories>
         <repository>
             <id>wso2-nexus</id>

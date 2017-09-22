@@ -44,7 +44,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Authenticator of X509Certificate
+ * Authenticator of X509Certificate.
  */
 public class X509CertificateAuthenticator extends AbstractApplicationAuthenticator implements
         LocalApplicationAuthenticator {
@@ -67,14 +67,27 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
         String authEndpoint = X509CertificateConstants.AUTH_ENDPOINT;;
         try {
             if (authenticationContext.isRetrying()) {
-                if (Boolean.parseBoolean(String.valueOf(authenticationContext.
-                        getProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE)))) {
-                    String errorPage = IdentityUtil.getServerURL(X509CertificateConstants.ERROR_PAGE, false, false);
-                    String errorPageUrl =
-                            errorPage + ("?sessionDataKey=" + authenticationContext.getContextIdentifier()) +
-                                    "&authenticators=" + getName() + X509CertificateConstants.RETRY_PARAM;
-                    httpServletResponse.sendRedirect(errorPageUrl);
+                String errorPage = IdentityUtil.getServerURL(X509CertificateConstants.ERROR_PAGE, false, false);
+                String errorPageUrl;
+                if (authenticationContext.getProperty(X509CertificateConstants.AUTHENTICATION_FAILED).equals
+                        (X509CertificateConstants.CERTIFICATE_NOT_FOUND)) {
+                     errorPageUrl = errorPage + ("?sessionDataKey=" + authenticationContext.getContextIdentifier()) +
+                                    "&authenticators=" + getName() +
+                                    X509CertificateConstants.RETRY_PARAM_FOR_CHECKING_CERTIFICATE;
+
+                    authenticationContext.setProperty(X509CertificateConstants.AUTHENTICATION_FAILED, "");
+                }else{
+                     errorPageUrl = errorPage + ("?sessionDataKey=" + authenticationContext.getContextIdentifier()) +
+                                    "&authenticators=" + getName() +
+                                    X509CertificateConstants.RETRY_PARAM_FOR_AUTHENTICATION_FAILED;
+                    if (log.isDebugEnabled()) {
+                        log.debug("Redirect to 'Authentication failed' error page: " + errorPageUrl);
+                    }
                 }
+                if (log.isDebugEnabled()) {
+                    log.debug("Redirect to error page: " + errorPageUrl);
+                }
+                httpServletResponse.sendRedirect(errorPageUrl);
             } else {
                 String authEndpointParam = getAuthenticatorConfig().getParameterMap().
                         get(X509CertificateConstants.AUTHENTICATION_ENDPOINT);
@@ -87,7 +100,7 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                 String encodedUrl = (authEndpoint + ("?" + queryParams));
                 httpServletResponse.sendRedirect(encodedUrl);
                 if (log.isDebugEnabled()) {
-                    log.debug("Request send to " + authEndpoint);
+                    log.debug("Request sent to " + authEndpoint);
                 }
             }
         } catch (IOException e) {
@@ -111,13 +124,17 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
             throws AuthenticationFailedException {
         Object object = httpServletRequest.getAttribute(X509CertificateConstants.X_509_CERTIFICATE);
         if (object != null) {
-            X509Certificate[] certificates = (X509Certificate[]) object;
+            X509Certificate[] certificates;
+            if(object instanceof X509Certificate[]){
+                certificates = (X509Certificate[]) object;
+            }else {
+                throw new AuthenticationFailedException("Exception while casting the X509Certificate");
+            }
             if (certificates.length > 0) {
                 if (log.isDebugEnabled()) {
                     log.debug("X509 Certificate Checking in servlet is done! ");
                 }
-                X509Certificate certs[] = (X509Certificate[]) object;
-                X509Certificate cert = certs[0];
+                X509Certificate cert = certificates[0];
                 byte[] data;
                 try {
                     data = cert.getEncoded();
@@ -134,14 +151,13 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                 } else {
                     userName = getCertificateUserName();
                 }
-                if (!StringUtils.isNotEmpty(userName)) {
+                if (StringUtils.isEmpty(userName)) {
                     throw new AuthenticationFailedException("username can't be empty");
                 }
-                X509CertificateUtil certificateUtil = new X509CertificateUtil();
-                if (!certificateUtil.isCertificateExist(userName)) {
-                    certificateUtil.addCertificate(userName, data);
+                if (!X509CertificateUtil.isCertificateExist(userName)) {
+                    X509CertificateUtil.addCertificate(userName, data);
                     allowUser(userName, claims, cert, authenticationContext);
-                } else if (certificateUtil.validateCerts(userName, data)) {
+                } else if (X509CertificateUtil.validateCerts(userName, data)) {
                     allowUser(userName, claims, cert, authenticationContext);
                 } else {
                     throw new AuthenticationFailedException("X509Certificate is not valid");
@@ -150,8 +166,9 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
                 throw new AuthenticationFailedException("X509Certificate object is null");
             }
         } else {
-            authenticationContext.setProperty(X509CertificateConstants.UNABLE_TO_FIND_CERTIFICATE, true);
-            throw new AuthenticationFailedException("Unable to find X509 Certificate");
+            authenticationContext.setProperty(X509CertificateConstants.AUTHENTICATION_FAILED,
+                    X509CertificateConstants.CERTIFICATE_NOT_FOUND);
+            throw new AuthenticationFailedException("Unable to find X509 Certificate in browser");
         }
     }
 
@@ -227,15 +244,16 @@ public class X509CertificateAuthenticator extends AbstractApplicationAuthenticat
             throw new AuthenticationFailedException("error occurred while get the certificate claims", e);
         }
         String userNameAttribute = null;
-        if (getAuthenticatorConfig().getParameterMap()
-                .get(X509CertificateConstants.USERNAME) != null) {
-            userNameAttribute = getAuthenticatorConfig().getParameterMap()
-                    .get(X509CertificateConstants.USERNAME);
+        if (getAuthenticatorConfig().getParameterMap().get(X509CertificateConstants.USERNAME) != null) {
+            userNameAttribute = getAuthenticatorConfig().getParameterMap().get(X509CertificateConstants.USERNAME);
+            if (log.isDebugEnabled()) {
+                log.debug("Getting username attribute: " + userNameAttribute);
+            }
         }
         for (Rdn distinguishNames : ldapDN.getRdns()) {
             claims.put(ClaimMapping.build(distinguishNames.getType(), distinguishNames.getType(),
                     null, false), String.valueOf(distinguishNames.getValue()));
-            if (!StringUtils.isEmpty(userNameAttribute)) {
+            if (StringUtils.isNotEmpty(userNameAttribute)) {
                 if (userNameAttribute.equals(distinguishNames.getType())) {
                     setCertificateUserName(String.valueOf(distinguishNames.getValue()));
                 }
